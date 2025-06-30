@@ -1,5 +1,5 @@
-from functools import cache, cached_property
 from pathlib import Path
+from functools import cache, cached_property
 
 import numpy as np
 import pandas as pd
@@ -11,22 +11,52 @@ pd.set_option("mode.copy_on_write", True)
 
 class Dataset:
     def __init__(self, path: Path):
+        '''
+        Initialize the Dataset object.
+
+        Args:
+            path (Path): Path to the ARFF file to load.
+        '''
         self.path = path
 
     @cached_property
     def _arff(self):
+        '''
+        Load the ARFF file from the specified path.
+
+        Returns:
+            tuple: Data and metadata loaded from the ARFF file.
+        '''
         return loadarff(self.path)
 
     @cached_property
-    def cls_list(self):
+    def cls_list(self): # TODO: why are the labels being saved as bytes? 
+        '''
+        Get the list of class labels as bytes.
+
+        Returns:
+            list: List of class labels in bytes format.
+        '''
         return list(map(str.encode, self._arff[1]["class1"][1]))
 
     @cached_property
     def cls_id_map(self):
+        '''
+        Map class labels to integer IDs starting from 1.
+
+        Returns:
+            dict: Mapping from class label to integer ID.
+        '''
         return {c: index + 1 for index, c in enumerate(self.cls_list)}
 
     @cached_property
     def cls_id_repr_map(self):
+        '''
+        Map integer class IDs to human-readable string representations.
+
+        Returns:
+            dict: Mapping from integer ID to string label.
+        '''
         return {
             index + 1: f"{c.decode()} ({index + 1})"
             for index, c in enumerate(self.cls_list)
@@ -34,11 +64,23 @@ class Dataset:
 
     @cached_property
     def raw(self):
+        '''
+        Return the raw DataFrame loaded from the ARFF file.
+
+        Returns:
+            pd.DataFrame: Raw data as a DataFrame.
+        '''
         df = pd.DataFrame(self._arff[0])
         return df
 
     @cached_property
     def orig(self):
+        '''
+        Return the original DataFrame with three columns (class1, flowPktsPerSecond, and flowBytesPerSecond) renamed and integer class labels.
+
+        Returns:
+            pd.DataFrame: DataFrame with renamed columns and integer class labels instead of strings.
+        '''
         df = self.raw
         df = df.rename(
             columns={
@@ -52,13 +94,23 @@ class Dataset:
 
     @cached_property
     def with_dur(self):
-        # The rows with duration == 0 seem to be trash
+        '''
+        Return the DataFrame filtered to only rows with duration > 0.
+
+        Returns:
+            pd.DataFrame: Filtered DataFrame with duration > 0.
+        '''
         df = self.orig
         return df.loc[df.duration > 0]
 
     @property
     def mostly_present(self):
-        # These 5 features are always here (when duration > 0)
+        '''
+        List of the five features that are always present when duration > 0.
+
+        Returns:
+            list: List of feature names.
+        '''
         return [
             "duration",
             "pps",
@@ -69,14 +121,32 @@ class Dataset:
 
     @cached_property
     def numerical5(self):
+        '''
+        Return a DataFrame with the five mostly present numerical features and class label.
+
+        Returns:
+            pd.DataFrame: DataFrame with selected features and class label.
+        '''
         return self.with_dur[self.mostly_present + ["cls"]]
 
     @cached_property
     def drop_missing(self):
+        '''
+        Return a DataFrame with only rows where *at least* one value is positive.
+
+        Returns:
+            pd.DataFrame: The filtered DataFrame.
+        '''
         return positive(self.orig)
 
     @cached_property
     def flagged(self):
+        '''
+        Return a DataFrame with selected features and binary flags for feature presence for classes where the majority are missing.
+
+        Returns:
+            pd.DataFrame: DataFrame with selected features and binary indicator columns.
+        '''
         df = self.with_dur
 
         return pd.DataFrame(
@@ -105,6 +175,21 @@ class Dataset:
     def class_fraction(
         self, df_num: pd.DataFrame, df_den: pd.DataFrame | None = None
     ) -> pd.DataFrame:
+        '''
+        Calculate class-wise population statistics for a subset of the data.
+
+        Args:
+            df_num (pd.DataFrame): The numerator DataFrame (subset to analyze), must contain a 'cls' column.
+            df_den (pd.DataFrame, optional): The denominator DataFrame (reference set for relative fractions).
+                If None, uses the full dataset (self.orig).
+
+        Returns:
+            pd.DataFrame: A DataFrame with the following columns for each class:
+                - pop: Number of samples in df_num for each class.
+                - pop_f: Percentage of each class in df_num relative to the total in df_num.
+                - f: Percentage of each class in df_num relative to its count in df_den.
+            Includes an additional row ("all") with totals for all classes.
+        '''
         if df_den is None:
             df_den = self.orig
 
@@ -140,6 +225,15 @@ class Dataset:
 
 
 def describe(df: pd.DataFrame):
+    '''
+    Generate a custom description of the DataFrame, including log-transformed statistics.
+
+    Args:
+        df (pd.DataFrame): The DataFrame to describe.
+
+    Returns:
+        pd.DataFrame: Transposed DataFrame with log-transformed statistics and counts.
+    '''
     desc = df.describe()
     desc_t = desc.transpose()
 
@@ -153,5 +247,14 @@ def describe(df: pd.DataFrame):
 
 
 def positive(df: pd.DataFrame):
+    '''
+    Filter the DataFrame to only rows where at least one value is positive.
+
+    Args:
+        df (pd.DataFrame): The DataFrame to filter.
+
+    Returns:
+        pd.DataFrame: Filtered DataFrame with at least one positive value per row.
+    '''
     cond = (df > 0).apply("any", axis=1)
     return df.loc[cond]
