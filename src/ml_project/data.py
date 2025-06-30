@@ -3,6 +3,7 @@ from functools import cache, cached_property
 
 import numpy as np
 import pandas as pd
+import dataframe_image as dfi
 from scipy.io.arff import loadarff
 
 pd.set_option("future.no_silent_downcasting", True)
@@ -258,3 +259,13 @@ def positive(df: pd.DataFrame):
     '''
     cond = (df > 0).apply("any", axis=1)
     return df.loc[cond]
+
+def save(df: pd.DataFrame, file_name: str):
+    '''
+    Save a dataframe as an image in the img folder
+
+    Args: 
+        df (pd.DataFrame): The dataframe to save 
+        file_name (str) : the name of the file. 
+    '''
+    dfi.export(df, f"../img/{file_name}", table_conversion="chrome")
