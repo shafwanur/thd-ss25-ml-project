@@ -7,11 +7,49 @@ VAL_TYPES = [-1, 0, 1]
 
 
 class ValTypes:
+    '''
+    Analyze value types and logical relationships between features in a DataFrame.
+
+    Args:
+        df (pd.DataFrame): The DataFrame to analyze.
+        ignore (list[str], optional): List of columns to ignore in the analysis.
+    '''
     def __init__(self, df: pd.DataFrame, ignore: list[str] = []):
+        '''
+        Initialize the ValTypes object.
+
+        Args:
+            df (pd.DataFrame): The DataFrame to analyze.
+            ignore (list[str], optional): List of columns to ignore.
+        '''
         self.df = df
         self.ignore = ignore
 
+    @cached_property
+    def types(self):
+        '''
+        Compute all unique value type patterns in the DataFrame (ignoring specified columns).
+
+        Returns:
+            pd.DataFrame: DataFrame where each row is a unique pattern of value types (-1, 0, 1) and a count.
+        '''
+        return (
+            self.df.drop(columns=self.ignore)
+            .map(lambda x: -1 if x < 0 else 0 if x == 0 else 1)
+            .value_counts()
+            .reset_index()
+        )
+    
     def df_of_type(self, idx):
+        '''
+        Return the subset of the DataFrame matching the value type pattern at the given index.
+
+        Args:
+            idx (int): Index of the value type pattern in self.types.
+
+        Returns:
+            pd.DataFrame: Subset of the DataFrame matching the pattern.
+        '''
         typ = self.types.drop(columns="count").iloc[idx]
         cond = True
         for feat in typ.index:
@@ -25,16 +63,13 @@ class ValTypes:
         return self.df.loc[cond]
 
     @cached_property
-    def types(self):
-        return (
-            self.df.drop(columns=self.ignore)
-            .map(lambda x: -1 if x < 0 else 0 if x == 0 else 1)
-            .value_counts()
-            .reset_index()
-        )
-
-    @cached_property
     def types_counts(self):
+        '''
+        Count the occurrences of each value type (-1, 0, 1) for each feature.
+
+        Returns:
+            pd.DataFrame: Grouped counts of value types per feature.
+        '''
         return (
             self.types.melt(
                 id_vars=["count"], value_vars=list(set(self.types.columns) - {"count"})
@@ -45,6 +80,12 @@ class ValTypes:
 
     @cached_property
     def unique_types(self):
+        '''
+        List the unique value types present for each feature.
+
+        Returns:
+            pd.Series: Series mapping feature names to arrays of unique value types.
+        '''
         return (
             self.types.drop(columns="count")
             .transpose()
@@ -53,8 +94,13 @@ class ValTypes:
 
     @cached_property
     def impls(self):
-        """returns dictionary: if_feat => if_val => then_val => then_feat"""
+        '''
+        Compute logical implication relationships between feature value types.
 
+        Returns:
+            dict: Nested dictionary of the form {if_feat: {if_val: {then_val: [then_feat, ...]}}}
+                  representing which features are implied by others for each value type.
+        '''
         df = self.types
         feats = df.drop(columns="count")
 
@@ -80,8 +126,12 @@ class ValTypes:
 
     @cached_property
     def impls_df(self):
-        """turns the connections dictionary into dataframe"""
+        '''
+        Convert the logical implication relationships into a DataFrame.
 
+        Returns:
+            pd.DataFrame: DataFrame with columns [if_feat, if_val, then_feat, then_val].
+        '''
         tuples = []
 
         for f, i1 in self.impls.items():
@@ -96,8 +146,12 @@ class ValTypes:
 
     @cached_property
     def eq_groups(self):
-        """returns a list of equivalence classes based on the connections dictionary"""
+        '''
+        Find equivalence groups of features based on logical implication relationships.
 
+        Returns:
+            list: List of sets, each set contains tuples (feature, value_type) that are equivalent.
+        '''
         def get_connected(feature, val, implied_val):
             return self.impls.get(feature, {}).get(val, {}).get(implied_val, [])
 
