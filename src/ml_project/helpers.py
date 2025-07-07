@@ -5,6 +5,9 @@ import numpy as np
 import pandas as pd
 from IPython.display import display
 
+import sqlite3
+from datetime import datetime 
+
 VAL_TYPES = [-1, 0, 1]
 
 
@@ -272,3 +275,67 @@ def check_condition(df: pd.DataFrame, cond: pd.Series, msg: str) -> bool:
     print(f"FAIL: {msg}")
     display(df.loc[~cond])
     return False
+
+def save_metrics(alg: str = "rf", params: str = "", report: str = ""):
+    """
+    Save model metrics and parameters to the 'stats' table in a results.db SQLite database.
+    The function creates the table if it does not exist and inserts a new row with the current time, algorithm, parameters, and classification report.
+
+    Args:
+        alg (str): The algorithm name.
+        params (str): String representation of the model parameters.
+        report (str): String representation of any string report (ex. classification_report).
+    """
+    time = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    # Connect to (or create) the database
+    conn = sqlite3.connect("results.db")
+    c = conn.cursor()
+
+    # Create the table if it doesn't exist
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS stats (
+        alg TEXT,
+        time TEXT,
+        params TEXT,
+        report TEXT
+    )
+    """)
+
+    # Insert the data
+    c.execute("INSERT INTO stats (alg, time, params, report) VALUES (?, ?, ?, ?)", (alg, time, params, report))
+
+    conn.commit()
+    conn.close()
+
+def retrieve_metrics(alg: str = "rf"):
+    """
+    Prints all rows from the stats table where the 'alg' column matches the given algorithm name.
+
+    Args:
+        alg (str): The algorithm name to filter by.
+    """
+    conn = sqlite3.connect("results.db")
+    c = conn.cursor()
+    c.execute("SELECT * FROM stats WHERE alg = ?", (alg,))
+    rows = c.fetchall()
+    conn.close()
+
+    for row in rows: 
+        for item in row:
+            print(item)
+        
+        print()
+
+def delete_table(table_name: str = "stats"):
+    """
+    Delete the specified table from the results.db SQLite database. 
+
+    Args:
+        table_name (str): The name of the table to delete (default is "stats").
+    """
+    conn = sqlite3.connect("results.db")
+    c = conn.cursor()
+    c.execute(f"DROP TABLE IF EXISTS {table_name}")
+    conn.commit()
+   
