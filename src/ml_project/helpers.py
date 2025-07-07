@@ -199,7 +199,7 @@ def fix_mean_rounding(df: pd.DataFrame, value: str):
     assert check_condition(loc, loc[std].eq(0), f"{std} == 0")
     rounded_cond = loc[min].map(round_time) == loc[mean]
     assert check_condition(loc, rounded_cond, f"{mean} == rount_time({min})")
-    check_condition(loc, cond, "min == max and min != mean")
+    check_condition(loc, ~cond, "min == max and min != mean")
 
     # Return updated df
     res = df.copy(deep=False)
