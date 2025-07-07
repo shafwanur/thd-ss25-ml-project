@@ -1,5 +1,6 @@
 from functools import cache, cached_property
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -51,7 +52,7 @@ class Dataset:
         return df
 
     @cached_property
-    def with_dur(self):
+    def with_dur(self) -> pd.DataFrame:
         # The rows with duration == 0 seem to be trash
         df = self.orig
         return df.loc[df.duration > 0]
@@ -146,7 +147,7 @@ def describe(df: pd.DataFrame):
     return (
         desc.apply(np.log)
         .map(lambda x: -np.inf if x == -np.inf else x * 10 // 1 / 10)
-        .assign(clas=desc["cls"])
+        .assign(cls=desc["cls"])
         .transpose()
         .assign(count=desc_t["count"])
     )
