@@ -188,25 +188,27 @@ def stats(value: str):
 
 
 def fix_mean_rounding(df: pd.DataFrame, value: str):
-    """For some rows, when min == max, mean is rounded to 0.1 seconds.
+    """For some rows, mean is rounded to 0.1 seconds.
     Fixes this.
     """
 
     print(f"fix mean rounding for {value}")
 
-    min, max, mean, std = stats(value)
-    cond = (df[min] == df[max]) & (df[min] != df[mean])
+    min, max, mean, _ = stats(value)
 
-    # Ensure the case
-    loc = df.loc[cond, [min, max, mean, std]]
-    assert check_condition(loc, loc[std].eq(0), f"{std} == 0")
-    rounded_cond = loc[min].map(round_time) == loc[mean]
-    assert check_condition(loc, rounded_cond, f"{mean} == rount_time({min})")
-    check_condition(loc, ~cond, "min == max and min != mean")
+    r5 = lambda x: x if x < 0 else round(x, -5)
+    r6 = lambda x: x if x < 0 else round(x, -6)
+
+    mean_rounded5min = (df[min] != 0) & (df[min].map(r5) == df[mean])
+    mean_rounded6min = (df[min] != 0) & (df[min].map(r6) == df[mean])
+    mean_rounded5max = (df[max] != 0) & (df[max].map(r5) == df[mean])
+    mean_rounded6max = (df[max] != 0) & (df[max].map(r6) == df[mean])
+    mean_rounded = mean_rounded5min | mean_rounded6min | mean_rounded5max | mean_rounded6max
+    check_condition(df.loc[:, [min, max, mean]], ~mean_rounded, "means are not rounded")
 
     # Return updated df
     res = df.copy(deep=False)
-    res.loc[cond, mean] = res[min]
+    res.loc[mean_rounded, mean] = (res[min] + res[max]) / 2
     return res
 
 
@@ -250,16 +252,16 @@ def round_time(x: float):
 
 def check_stat_invariants(df: pd.DataFrame, value: str, with_std: bool = True) -> None:
     min, max, mean, std = stats(value)
-    check_condition(df, df[min] <= df[mean], f"{min} <= {mean}")
-    check_condition(df, df[mean] <= df[max], f"{mean} <= {max}")
+    check_condition(df.loc[:, [min, max, mean]], df[min] <= df[mean], f"{min} <= {mean}")
+    check_condition(df.loc[:, [min, max, mean]], df[mean] <= df[max], f"{mean} <= {max}")
     if with_std:
         check_condition(
-            df,
+            df.loc[:, [min, max, mean, std]],
             ((df[min] != df[max]) | (df[std] == 0)),
             f"{min} == {max} => {std} == 0",
         )
         check_condition(
-            df,
+            df.loc[:, [min, max, mean, std]],
             ((df[min] == df[max]) | (df[std] != 0)),
             f"{std} == 0 => {min} == {max}",
         )
