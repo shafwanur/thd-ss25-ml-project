@@ -6,11 +6,14 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "dataframe-image>=0.2.7",
+    "graphviz>=0.21",
     "jinja2>=3.1.6",
+    "kagglehub>=0.3.12",
     "matplotlib>=3.10.3",
     "numpy>=2.2.6",
     "pandas>=2.3.0",
     "scikit-learn>=1.7.0",
+    "scikit-optimize>=0.10.2",
     "scipy>=1.15.3",
 ]
 
