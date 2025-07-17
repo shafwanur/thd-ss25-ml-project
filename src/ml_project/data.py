@@ -1,9 +1,10 @@
-from pathlib import Path
 from functools import cache, cached_property
+from pathlib import Path
+from typing import cast
 
+import dataframe_image as dfi
 import numpy as np
 import pandas as pd
-import dataframe_image as dfi
 from scipy.io.arff import loadarff
 
 pd.set_option("future.no_silent_downcasting", True)
@@ -94,7 +95,7 @@ class Dataset:
         return df
 
     @cached_property
-    def with_dur(self):
+    def with_dur(self) -> pd.DataFrame:
         '''
         Return the DataFrame filtered to only rows with duration > 0.
 
@@ -241,7 +242,7 @@ def describe(df: pd.DataFrame):
     return (
         desc.apply(np.log)
         .map(lambda x: -np.inf if x == -np.inf else x * 10 // 1 / 10)
-        .assign(clas=desc["cls"])
+        .assign(cls=desc["cls"])
         .transpose()
         .assign(count=desc_t["count"])
     )
